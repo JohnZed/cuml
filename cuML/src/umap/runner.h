@@ -164,6 +164,11 @@ namespace UMAPAlgo {
 		        nnz,
 		        params, embeddings, stream, params->init);
 
+		thrust::device_ptr<float> dev_embed = thrust::device_pointer_cast(embeddings);
+		if (params->verbose) {
+			printf("Post-init embeddings: %f, %f, ...\n", (float)dev_embed[0], (float)dev_embed[1]);
+		}
+
 		/**
 		 * Run simplicial set embedding to approximate low-dimensional representation
 		 */
@@ -172,6 +177,11 @@ namespace UMAPAlgo {
 		        X, n, d,
 		        rgraph_rows, rgraph_cols, rgraph_vals, nnz,
 		        params, embeddings, stream);
+
+		dev_embed = thrust::device_pointer_cast(embeddings);
+		if (params->verbose) {
+			printf("Post-run embeddings:  %f, %f, ...\n", (float)dev_embed[0], (float)dev_embed[1]);
+		}
 
         CUDA_CHECK(cudaPeekAtLastError());
 
@@ -206,6 +216,12 @@ namespace UMAPAlgo {
         MLCommon::allocate(knn_indices, n*params->n_neighbors);
         MLCommon::allocate(knn_dists, n*params->n_neighbors);
 
+		thrust::device_ptr<float> dev_embed = thrust::device_pointer_cast(embedding);
+		if (params->verbose) {
+			std::cout << "Begin xform embeddings: "
+					  << dev_embed[0] << ", " << dev_embed[1] << std::endl;
+		}
+		
         knn->search(X, n, knn_indices, knn_dists, params->n_neighbors);
         CUDA_CHECK(cudaPeekAtLastError());
 
@@ -282,9 +298,16 @@ namespace UMAPAlgo {
          MLCommon::Sparse::csr_row_normalize_l1<TPB_X, T><<<grid_n, blk>>>(dev_ex_scan.get(), graph_vals, nnz,
                  n, vals_normed);
 
+		 
         init_transform<TPB_X, T><<<grid_n,blk>>>(graph_cols, vals_normed, n,
                 embedding, embedding_n, params->n_components,
                 transformed, params->n_neighbors);
+
+		dev_embed = thrust::device_pointer_cast(embedding);
+		if (params->verbose) {
+			std::cout << "Post-init xform embeddings: "
+					  << dev_embed[0] << ", " << dev_embed[1] << std::endl;
+		}
 
         CUDA_CHECK(cudaPeekAtLastError());
         CUDA_CHECK(cudaFree(vals_normed));
@@ -346,6 +369,12 @@ namespace UMAPAlgo {
                                                     epochs_per_sample, stream);
         CUDA_CHECK(cudaPeekAtLastError());
 
+		dev_embed = thrust::device_pointer_cast(embedding);
+		if (params->verbose) {
+			std::cout << "Pre-optimize xform embeddings: "
+					  << dev_embed[0] << ", " << dev_embed[1] << std::endl;
+		}
+		
         SimplSetEmbedImpl::optimize_layout<TPB_X, T>(
             transformed, n,
             embedding, embedding_n,

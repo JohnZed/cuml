@@ -15,7 +15,7 @@
  */
 
 #include "umap/umapparams.h"
-#include "algo.h"
+#include "umap/simpl_set_embed/algo.h"
 
 #pragma once
 

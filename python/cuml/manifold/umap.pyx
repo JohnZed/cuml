@@ -43,6 +43,7 @@ cdef extern from "umap/umapparams.h" namespace "ML":
         float min_dist,
         float spread,
         int init,
+        long long random_seed,
         float set_op_mix_ratio,
         float local_connectivity,
         float repulsion_strength,
@@ -149,6 +150,21 @@ cdef class UMAP:
         ``spread``.
     verbose: bool (optional, default False)
         Controls verbosity of logging.
+    random_seed: int or None
+        If random_seed is 0, a new seed will be chosen based on timestamp
+        for each run.
+
+    Notes
+    -----
+    This implementation is heavily based on Leland McInnes' UMAP package, but
+    this cuML version is missing several features from that original version:
+
+    References
+    -----------
+    * Leland McInnes, John Healy, James Melville
+      UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction
+      https://arxiv.org/abs/1802.03426
+
     """
 
     cpdef UMAPParams *umap_params
@@ -174,6 +190,7 @@ cdef class UMAP:
                   repulsion_strength=1.0,
                   negative_sample_rate=5,
                   transform_queue_size=4.0,
+                  random_seed=None,
                   init="spectral",
                   verbose = False,
                   a = None,
@@ -200,6 +217,9 @@ cdef class UMAP:
 
         if b is not None:
             self.umap_params.b = <float>b
+
+        if random_seed is not None:
+            self.umap_params.random_seed = <int>random_seed
 
         self.umap_params.learning_rate = <float>learning_rate
         self.umap_params.min_dist = <float>min_dist

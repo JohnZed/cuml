@@ -171,6 +171,14 @@ namespace UMAPAlgo {
                             // happens only during unsupervised training
                             if(move_other)
                                 atomicAdd(other+d, -grad_d * alpha);
+
+							if (row == 0 && d < 1 && epoch < 10) {
+								thrust::device_ptr<T> dev_current =
+									thrust::device_pointer_cast(current);
+									
+								/* printf("Epoch %3d current[row=%d][d=%d]: %f\n", */
+								/* 	   epoch, row, d, current[0]); */
+							}
                         }
 
                         epoch_of_next_sample[row] += epochs_per_sample[row];
@@ -190,7 +198,10 @@ namespace UMAPAlgo {
                             float r;
                             gen.next<float>(r);
                             int t = r*tail_n;
-
+							if (params.verbose && row == 0 && p < 5 && epoch < 10) {
+								printf("Epoch %3d: Next float[row=%d][%d]: %f\n", epoch, row, p, r);
+							}
+							
                             T *negative_sample = tail_embedding+(t*params.n_components);
                             dist_squared = rdist(current, negative_sample, params.n_components);
 
@@ -213,6 +224,13 @@ namespace UMAPAlgo {
                                 else
                                     grad_d = 4.0;
                                 atomicAdd(current+d, grad_d * alpha);
+
+								if (params.verbose && row == 0 && p < 1 && epoch < 10) {
+									thrust::device_ptr<T> dev_current =
+										thrust::device_pointer_cast(current);
+									printf("Epoch %3d: Post-add[row=%d][%d]: %f\n",
+										   epoch, row, p, (float)dev_current[d]);
+								}
                             }
 
                             epoch_of_next_negative_sample[row] +=
@@ -264,16 +282,33 @@ namespace UMAPAlgo {
 	            T *epoch_of_next_sample;
                 MLCommon::allocate(epoch_of_next_sample, nnz);
                 MLCommon::copy(epoch_of_next_sample, epochs_per_sample, nnz, stream);
-
+				
                 dim3 grid(MLCommon::ceildiv(nnz, TPB_X), 1, 1);
                 dim3 blk(TPB_X, 1, 1);
+				
+		long long base_seed = params->random_seed;
+		if (base_seed == 0LL) {
+		    struct timeval tp;
+		    gettimeofday(&tp, NULL);
+		    base_seed = tp.tv_sec * 1000 + tp.tv_usec;
+			printf("Using timestamp-based seed: %lld\n", base_seed);
+		}
 
-                for(int n = 0; n < n_epochs; n++) {
-
-                    struct timeval tp;
-                    gettimeofday(&tp, NULL);
-                    long long seed = tp.tv_sec * 1000 + tp.tv_usec;
-
+		thrust::device_ptr<float> dev_embed =
+			thrust::device_pointer_cast(tail_embedding);
+		if (params->verbose) {
+			printf("Begin epochs - first embeddings: %f, %f, ...\n",
+				   (float)dev_embed[0], (float)dev_embed[1]);
+		}
+		
+		for(int n = 0; n < n_epochs; n++) {
+			long long epoch_seed = base_seed + n;
+		    if (n < 5 && params->verbose) {
+				printf("Epoch %3d, seed %lld\n", n, epoch_seed);
+				printf("Epoch start -- first embeddings: %f, %f, ...\n",
+					   (float)dev_embed[0], (float)dev_embed[1]);
+		    }
+			
                     optimize_batch_kernel<T, TPB_X><<<grid,blk>>>(
 	                    head_embedding, head_n,
 	                    tail_embedding, tail_n,
@@ -287,7 +322,7 @@ namespace UMAPAlgo {
 	                    alpha,
 	                    n,
 	                    gamma,
-	                    seed,
+	                    epoch_seed,
 	                    *params
 	                );
 
@@ -311,7 +346,7 @@ namespace UMAPAlgo {
 
 	            dim3 grid(MLCommon::ceildiv(m, TPB_X), 1, 1);
 	            dim3 blk(TPB_X, 1, 1);
-
+				
 	            /**
 	             * Find vals.max()
 	             */
@@ -335,6 +370,10 @@ namespace UMAPAlgo {
 	            T *epochs_per_sample;
 	            MLCommon::allocate(epochs_per_sample, nnz);
 
+				thrust::device_ptr<float> dev_embed = thrust::device_pointer_cast(embedding);
+				std::cout << "Pre-optimize embeddings: "
+			      << dev_embed[0] << ", " << dev_embed[1] << std::endl;
+
 	            make_epochs_per_sample(vals, nnz, params->n_epochs, epochs_per_sample, stream);
 	            optimize_layout<TPB_X, T>(embedding, m,
 	                            embedding, m,
@@ -345,6 +384,9 @@ namespace UMAPAlgo {
 	                            params,
 	                            params->n_epochs,
                               stream);
+
+				std::cout << "Post-optimize embeddings: "
+			      << dev_embed[0] << ", " << dev_embed[1] << std::endl;				
 
 	            CUDA_CHECK(cudaPeekAtLastError());
                 CUDA_CHECK(cudaFree(epochs_per_sample));

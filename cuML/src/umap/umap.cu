@@ -46,6 +46,7 @@ namespace ML {
     void UMAP_API::fit(float *X, int n, int d, float *embeddings) {
         this->knn = new kNN(d);
         cudaStream_t stream;
+ 		
         CUDA_CHECK(cudaStreamCreate(&stream));
         UMAPAlgo::_fit<float, TPB_X>(X, n, d, knn, get_params(), embeddings, stream);
         CUDA_CHECK(cudaStreamDestroy(stream));

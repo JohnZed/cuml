@@ -134,7 +134,11 @@ namespace ML {
          */
         int init = 1;
 
-
+	/**
+	 * 0 = Generate seed from timestamp
+	 * nonzero = Random seed
+	 */
+	long long random_seed = 0;
     };
 
 }
