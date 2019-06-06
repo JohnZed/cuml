@@ -3,8 +3,10 @@ Fixtures and utilities for benchmark tests
 """
 import pytest
 import time
-import junit_xml as jxml
 import pprint
+from _pytest.junitxml import record_property
+from collections import defaultdict
+import statistics
 
 class BenchTimer:
     def __init__(self):
@@ -35,52 +37,52 @@ class BenchTimer:
         for i in range(reps):
             yield
 
-class JUnitCollector:
-    """Captures test results and reports out in XML"""
-    def __init__(self):
-        self.suites = {}
 
-    def collect_result(self, request, key, value):
-        """Stores a key=value result for current test specified by 'request'"""
-        module = request.node.module.__name__
-        name = request.node.name
-        if module not in self.suites:
-            self.suites[module] = {}
-        if name not in self.suites[module]:
-            self.suites[module][name] = {}
-
-        self.suites[module][name][key] = value
-
-    def junit_tree(self):
-        """Returns junit object representing test results"""
-        suite_results = []
-        for suite_name, suite_cases_raw in self.suites.items():
-            suite_cases_parsed = []
-            for k,v in suite_cases_raw.items():
-                suite_cases_parsed.append(
-                    jxml.TestCase(k, k.split('[')[0], v['time']))
-
-            suite_results.append(
-                jxml.TestSuite(suite_name, suite_cases_parsed))
-        return suite_results
-
-    def junit_xml(self):
-        return jxml.TestSuite.to_xml_string(self.junit_tree())
-
-@pytest.fixture(scope="session")
-def _junit_writer(request):
-    """Tests should not use this fixture directly"""
-    collector = JUnitCollector()
-    yield collector
-    result_str = pprint.pprint(collector.suites)
-
-    # XXX The real version would write to alog
-    print("\n---\n", result_str)
-    print("\n---\n", collector.junit_xml())
 
 
 @pytest.fixture
-def benchmark_logger(_junit_writer, request):
+def log_value(request, record_property):
+    """
+    The log_value fixture provides a callable that tests can invoke like
+      def test_foo(log_value):
+        log_value(my_key=my_result)
+    """
+    def _inner_logger(**kwargs):
+        for k,v in kwargs.items():
+            record_property(k, v)
+            
+    yield _inner_logger
+
+
+@pytest.fixture(scope="function")
+def log_mean_value(request, record_property):
+    """
+    The log_mean_value fixture provides a callable that tests can invoke like
+      def test_foo(log_mean_value):
+        log_mean_value(my_key=my_result)
+
+    This will add the mean value for each key to the output tuple
+    if the same key is logged multiple times within a test. E.g.
+
+      for i in range(10):
+        log_mean_value(my_num=i)
+
+    will add the "(my_num, 4.5)" tuple to the junit xml
+    """
+    key_value_results = defaultdict(list)
+    
+    def _inner_logger(**kwargs):
+        for k,v in kwargs.items():
+            key_value_results[k].append(v)
+
+    yield _inner_logger
+
+    for k,v in key_value_results.items():
+        record_property(k, statistics.mean(v))
+
+
+@pytest.fixture
+def benchmark_logger(request, log_value):
     """
     The benchmark_logger fixture provides a context manager that tests can invoke like:
       with benchmark_logger:
@@ -91,17 +93,4 @@ def benchmark_logger(_junit_writer, request):
     """
     bt = BenchTimer()
     yield bt
-    _junit_writer.collect_result(request, "time", bt.get_benchmark_time())
-
-
-@pytest.fixture
-def log_value(_junit_writer, request):
-    """
-    The log_value fixture provides a callable that tests can invoke like
-      def test_foo(log_value):
-        log_value(my_key=my_result)
-    """
-    def _inner_logger(**kwargs):
-        for k,v in kwargs.items():
-            _junit_writer.collect_result(request, k, v)
-    yield _inner_logger
+    log_value(benchmark_time=bt.get_benchmark_time())
