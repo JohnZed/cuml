@@ -29,6 +29,7 @@
 - PR #1165: Adding except + in all remaining cython
 - PR #1173: Docs: Barnes Hut TSNE documentation
 - PR #1176: Use new RMM API based on Cython
+- PR #1150: RF Pickling using treelite
 
 ## Bug Fixes
 
