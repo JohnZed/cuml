@@ -23,9 +23,10 @@ import sklearn.random_projection
 from sklearn import metrics
 import cuml.metrics
 import cuml.decomposition
+import cuml.svm
 import umap
 import numpy as np
-
+import inspect
 
 class AlgorithmPair:
     """
@@ -93,6 +94,9 @@ class AlgorithmPair:
         all_args = {**self.shared_args, **self.cpu_args}
         all_args = {**all_args, **override_args}
 
+        supported_args = inspect.getfullargspec(self.cpu_class)[0]
+        all_args = {k:v for k,v in all_args.items() if k in supported_args}
+
         cpu_obj = self.cpu_class(**all_args)
         if self.data_prep_hook:
             data = self.data_prep_hook(data)
@@ -107,6 +111,9 @@ class AlgorithmPair:
         """Runs the cuml-based algorithm's fit method on specified data"""
         all_args = {**self.shared_args, **self.cuml_args}
         all_args = {**all_args, **override_args}
+
+        supported_args = inspect.getfullargspec(self.cuml_class)[0]
+        all_args = {k:v for k,v in all_args.items() if k in supported_args}
 
         cuml_obj = self.cuml_class(**all_args)
         if self.data_prep_hook:
@@ -198,6 +205,14 @@ def all_algorithms():
             accuracy_function=metrics.r2_score,
         ),
         AlgorithmPair(
+            sklearn.linear_model.Ridge,
+            cuml.linear_model.Ridge,
+            shared_args={},
+            name="Ridge",
+            accepts_labels=True,
+            accuracy_function=metrics.r2_score,
+        ),
+        AlgorithmPair(
             sklearn.linear_model.LogisticRegression,
             cuml.linear_model.LogisticRegression,
             shared_args={},
@@ -243,6 +258,24 @@ def all_algorithms():
             shared_args={},
             cuml_args=dict(eta0=0.005, epochs=100),
             name="MBSGDClassifier",
+            accepts_labels=True,
+            accuracy_function=cuml.metrics.accuracy_score,
+        ),
+        AlgorithmPair(
+            sklearn.svm.SVC,
+            cuml.svm.SVC,
+            shared_args={'kernel': 'linear'},
+            cuml_args=dict(),
+            name="SVC-linear",
+            accepts_labels=True,
+            accuracy_function=cuml.metrics.accuracy_score,
+        ),
+        AlgorithmPair(
+            sklearn.svm.SVC,
+            cuml.svm.SVC,
+            shared_args={'kernel': 'rbf', 'C': 1.0},
+            cuml_args=dict(),
+            name="SVC-rbf",
             accepts_labels=True,
             accuracy_function=cuml.metrics.accuracy_score,
         ),

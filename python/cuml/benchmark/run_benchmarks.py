@@ -98,6 +98,10 @@ if __name__ == '__main__':
         help='Evaluate at least min_rows samples',
     )
     parser.add_argument(
+        '--row-counts',
+        nargs='*',
+        type=int)
+    parser.add_argument(
         '--num-sizes',
         type=int,
         default=2,
@@ -133,6 +137,13 @@ if __name__ == '__main__':
                 key=val_list, where val_list may be a comma-separated list''',
     )
     parser.add_argument(
+        '--cpu-param-sweep',
+        nargs='*',
+        type=str,
+        help='''Parameter values to vary for cpu only, in the form:
+                key=val_list, where val_list may be a comma-separated list''',
+    )
+    parser.add_argument(
         '--default-size',
         action='store_true',
         help='Only run datasets at default size',
@@ -155,6 +166,10 @@ if __name__ == '__main__':
         num=args.num_sizes,
         dtype=np.int32,
     )
+    if args.row_counts:
+        bench_rows = args.row_counts
+        print("Using row counts: ", bench_rows)
+
     bench_dims = args.input_dimensions
 
     if args.num_features > 0:
@@ -165,6 +180,7 @@ if __name__ == '__main__':
 
     param_override_list = extract_param_overrides(args.param_sweep)
     cuml_param_override_list = extract_param_overrides(args.cuml_param_sweep)
+    cpu_param_override_list = extract_param_overrides(args.cpu_param_sweep)
 
     if args.algorithms:
         algos_to_run = []
@@ -185,6 +201,7 @@ if __name__ == '__main__':
         input_type=args.input_type,
         param_override_list=param_override_list,
         cuml_param_override_list=cuml_param_override_list,
+        cpu_param_override_list=cpu_param_override_list,
         run_cpu=(not args.skip_cpu),
         raise_on_error=args.raise_on_error
     )
