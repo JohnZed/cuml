@@ -35,14 +35,17 @@ def timed(txt):
 #         # print("X class: ", X.__class__, " C-order? ", X._c_contiguous)
 #         return super().fit(X, y, **kwargs)
 
-SCALE_FACTOR = int(1e2)
+SCALE_FACTOR = int(1e5)
 params = {'alpha': np.logspace(-3, -1, 10)}
 N_FOLDS = 5
 
 estimators = {
     "dummy-F": (DummyModel(order='F'),
                 {'alpha': np.logspace(-3, -1, 10)}),
+    # Run same model twice to check for caching effects
     "dummy-F2": (DummyModel(order='F'),
+                {'alpha': np.logspace(-3, -1, 10)}),
+    "dummy-C": (DummyModel(order='C'),
                 {'alpha': np.logspace(-3, -1, 10)}),
     # "ridge-F": (cumlRidge(fit_intercept=True,
     #                       solver="eig",
@@ -88,13 +91,13 @@ for name, (cu_clf, params) in estimators.items():
         cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
         cu_grid.fit(input_X, input_y, order='C')
 
-    # with timed("%14s-patched_search-F" % name):
-    #     cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
-    #     cu_grid.fit(input_X, input_y, order='F')
+    with timed("%14s-patched_search-F" % name):
+        cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
+        cu_grid.fit(input_X, input_y, order='F')
 
-    # with timed("%14s-sklearn_search" % name):
-    #     sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
-    #     sk_grid.fit(input_X, input_y)
+    with timed("%14s-sklearn_search" % name):
+        sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
+        sk_grid.fit(input_X, input_y)
 
 
 # Note - with a dummy model and the wrong input style, most time goes

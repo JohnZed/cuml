@@ -22,6 +22,7 @@ import rmm
 from numba import cuda
 from numba.cuda.cudadrv.driver import driver
 
+_gpu_major_tile_shape = (0,0) # Lazily initialized in gpu_major_converter
 
 def row_matrix(df):
     """Compute the C (row major) version gpu matrix of df
@@ -56,10 +57,11 @@ def general_kernel(input, output, nrows, ncols):
         output[tid, col_idx] = input[tid, col_idx]
         _col_offset += 1
 
-@cuda.jit
-def shared_kernel(input, output):
 
-    tile = cuda.shared.array(shape=tile_shape, dtype=dev_dtype)
+
+@cuda.jit
+def shared_kernel_float32(input, output):
+    tile = cuda.shared.array(shape=_gpu_major_tile_shape, dtype=numba.float32)
 
     tx = cuda.threadIdx.x
     ty = cuda.threadIdx.y
@@ -74,15 +76,36 @@ def shared_kernel(input, output):
     if y < output.shape[0] and x < output.shape[1]:
         output[y, x] = tile[tx, ty]
 
+@cuda.jit
+def shared_kernel_float64(input, output):
+    # XXX get rid of code duplication
+    tile = cuda.shared.array(shape=_gpu_major_tile_shape, dtype=numba.float32)
+
+    tx = cuda.threadIdx.x
+    ty = cuda.threadIdx.y
+    bx = cuda.blockIdx.x * cuda.blockDim.x
+    by = cuda.blockIdx.y * cuda.blockDim.y
+    y = by + tx
+    x = bx + ty
+
+    if by + ty < input.shape[0] and bx + tx < input.shape[1]:
+        tile[ty, tx] = input[by + ty, bx + tx]
+    cuda.syncthreads()
+    if y < output.shape[0] and x < output.shape[1]:
+        output[y, x] = tile[tx, ty]
+
+
 def gpu_major_converter(original, nrows, ncols, dtype, to_order='C'):
     row_major = rmm.device_array((nrows, ncols), dtype=dtype, order=to_order)
 
     tpb = driver.get_device().MAX_THREADS_PER_BLOCK
-
     tile_width = int(math.pow(2, math.log(tpb, 2) / 2))
     tile_height = int(tpb / tile_width)
 
-    tile_shape = (tile_height, tile_width + 1)
+    global _gpu_major_tile_shape
+    if _gpu_major_tile_shape == (0, 0):
+        # Needs to be a lazily initialized global to support cuda.jit
+        _gpu_major_tile_shape = (tile_height, tile_width + 1)
 
     # blocks and threads for the shared memory/tiled algorithm
     # see http://devblogs.nvidia.com/parallelforall/efficient-matrix-transpose-cuda-cc/ # noqa
@@ -96,18 +119,17 @@ def gpu_major_converter(original, nrows, ncols, dtype, to_order='C'):
 
     if dtype == 'float32':
         dev_dtype = numba.float32
-
     else:
         dev_dtype = numba.float64
-
 
     # check if we cannot call the shared memory kernel
     # block limits: 2**31-1 for x, 65535 for y dim of blocks
     if blocks[0] > 2147483647 or blocks[1] > 65535:
         general_kernel[bpg, tpb](original, row_major, nrows, ncols)
-
+    elif dev_dtype == numba.float32:
+        shared_kernel_float32[blocks, threads](original, row_major)
     else:
-        shared_kernel[blocks, threads](original, row_major, )
+        shared_kernel_float32[blocks, threads](original, row_major)
 
     return row_major
 
