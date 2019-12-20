@@ -323,3 +323,8 @@ class LogisticRegression(Base):
             ndarray, cuda array interface compliant array like CuPy
         """
         return accuracy_score(y, self.predict(X), handle=self.handle)
+
+
+    def get_param_names(self):
+        return ["C", "penalty", "tol", "fit_intercept", "max_iter",
+                "linesearch_max_iter"]

@@ -8,6 +8,7 @@ __pycache__
 *.so
 *.dylib
 .cache
+.cupy
 .coverage
 .vscode
 *.swp

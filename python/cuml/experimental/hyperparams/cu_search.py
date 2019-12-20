@@ -56,7 +56,7 @@ def _fit_and_score(estimator, X, y, scorer, train, test, verbose,
                    parameters, fit_params, return_train_score=False,
                    return_parameters=False, return_n_test_samples=False,
                    return_times=False, return_estimator=False,
-                   error_score=np.nan):
+                   error_score=np.nan, order='C'):
     """Fit estimator and compute scores for a given dataset split.
 
     Parameters
@@ -117,6 +117,10 @@ def _fit_and_score(estimator, X, y, scorer, train, test, verbose,
     return_estimator : boolean, optional, default: False
         Whether to return the fitted estimator.
 
+    order : str, default: 'C'
+        Order ('F' or 'C') of array to pass through
+        Added by RAPIDS.
+
     Returns
     -------
     train_scores : dict of scorer name -> float, optional
@@ -169,6 +173,14 @@ def _fit_and_score(estimator, X, y, scorer, train, test, verbose,
 
     X_train, y_train = _safe_split(estimator, X, y, train)
     X_test, y_test = _safe_split(estimator, X, y, test, train)
+    # X_train = X
+    # y_train = y
+    # X_test = X
+    # y_test = y
+
+    # XXX Modified by RAPIDS
+    X_train = cp.array(X_train, order=order, copy=False)
+    X_test = cp.array(X_test, order=order, copy=False)
 
     try:
         if y_train is None:
@@ -242,7 +254,7 @@ def _fit_and_score(estimator, X, y, scorer, train, test, verbose,
 # Begin patched classes
 #
 class patched_GridSearchCV(sk_GridSearchCV):
-    def fit(self, X, y=None, groups=None, **fit_params):
+    def fit(self, X, y=None, groups=None, order='C', **fit_params):
         """Run fit with all sets of parameters.
 
         Parameters
@@ -261,13 +273,16 @@ class patched_GridSearchCV(sk_GridSearchCV):
             train/test set. Only used in conjunction with a "Group" :term:`cv`
             instance (e.g., :class:`~sklearn.model_selection.GroupKFold`).
 
+
+        order : str, default: 'C'
+            Memory layout order of arrays to pass through to underlying fit
+
         **fit_params : dict of string -> object
             Parameters passed to the ``fit`` method of the estimator
         """
-        print("Using modified GridSearchCV")
+        # print("Using modified GridSearchCV")
         estimator = self.estimator
         cv = check_cv(self.cv, y, classifier=is_classifier(estimator))
-        print("CV is: ", cv.__class__)
 
         scorers, self.multimetric_ = _check_multimetric_scoring(
             self.estimator, scoring=self.scoring)
@@ -310,7 +325,8 @@ class patched_GridSearchCV(sk_GridSearchCV):
                                     return_times=True,
                                     return_parameters=False,
                                     error_score=self.error_score,
-                                    verbose=self.verbose)
+                                    verbose=self.verbose,
+                                    order=order)
         results = {}
         with parallel:
             all_candidate_params = []

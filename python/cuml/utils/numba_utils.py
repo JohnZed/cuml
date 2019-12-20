@@ -45,6 +45,35 @@ def row_matrix(df):
     return row_major
 
 
+@cuda.jit
+def general_kernel(input, output, nrows, ncols):
+    tid = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+    if tid >= nrows:
+        return
+    _col_offset = 0
+    while _col_offset < input.shape[1]:
+        col_idx = _col_offset
+        output[tid, col_idx] = input[tid, col_idx]
+        _col_offset += 1
+
+@cuda.jit
+def shared_kernel(input, output):
+
+    tile = cuda.shared.array(shape=tile_shape, dtype=dev_dtype)
+
+    tx = cuda.threadIdx.x
+    ty = cuda.threadIdx.y
+    bx = cuda.blockIdx.x * cuda.blockDim.x
+    by = cuda.blockIdx.y * cuda.blockDim.y
+    y = by + tx
+    x = bx + ty
+
+    if by + ty < input.shape[0] and bx + tx < input.shape[1]:
+        tile[ty, tx] = input[by + ty, bx + tx]
+    cuda.syncthreads()
+    if y < output.shape[0] and x < output.shape[1]:
+        output[y, x] = tile[tx, ty]
+
 def gpu_major_converter(original, nrows, ncols, dtype, to_order='C'):
     row_major = rmm.device_array((nrows, ncols), dtype=dtype, order=to_order)
 
@@ -71,42 +100,14 @@ def gpu_major_converter(original, nrows, ncols, dtype, to_order='C'):
     else:
         dev_dtype = numba.float64
 
-    @cuda.jit
-    def general_kernel(input, output):
-        tid = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-        if tid >= nrows:
-            return
-        _col_offset = 0
-        while _col_offset < input.shape[1]:
-            col_idx = _col_offset
-            output[tid, col_idx] = input[tid, col_idx]
-            _col_offset += 1
-
-    @cuda.jit
-    def shared_kernel(input, output):
-
-        tile = cuda.shared.array(shape=tile_shape, dtype=dev_dtype)
-
-        tx = cuda.threadIdx.x
-        ty = cuda.threadIdx.y
-        bx = cuda.blockIdx.x * cuda.blockDim.x
-        by = cuda.blockIdx.y * cuda.blockDim.y
-        y = by + tx
-        x = bx + ty
-
-        if by + ty < input.shape[0] and bx + tx < input.shape[1]:
-            tile[ty, tx] = input[by + ty, bx + tx]
-        cuda.syncthreads()
-        if y < output.shape[0] and x < output.shape[1]:
-            output[y, x] = tile[tx, ty]
 
     # check if we cannot call the shared memory kernel
     # block limits: 2**31-1 for x, 65535 for y dim of blocks
     if blocks[0] > 2147483647 or blocks[1] > 65535:
-        general_kernel[bpg, tpb](original, row_major)
+        general_kernel[bpg, tpb](original, row_major, nrows, ncols)
 
     else:
-        shared_kernel[blocks, threads](original, row_major)
+        shared_kernel[blocks, threads](original, row_major, )
 
     return row_major
 

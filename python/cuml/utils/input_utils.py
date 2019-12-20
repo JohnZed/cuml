@@ -29,7 +29,7 @@ from collections.abc import Collection
 from numba import cuda
 
 import rmm
-
+import cupy as cp
 
 inp_array = namedtuple('inp_array', 'array pointer n_rows n_cols dtype')
 

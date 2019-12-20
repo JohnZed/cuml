@@ -9,6 +9,7 @@ from cuml import LogisticRegression as cumlLogisticRegression
 
 import cudf
 import copy
+import cupy as cp
 
 from sklearn import datasets
 from sklearn.model_selection import train_test_split as sk_train_test_split, \
@@ -34,21 +35,21 @@ def timed(txt):
 #         # print("X class: ", X.__class__, " C-order? ", X._c_contiguous)
 #         return super().fit(X, y, **kwargs)
 
-SCALE_FACTOR = int(1e5)
+SCALE_FACTOR = int(1e2)
 params = {'alpha': np.logspace(-3, -1, 10)}
 N_FOLDS = 5
 
 estimators = {
     "dummy-F": (DummyModel(order='F'),
                 {'alpha': np.logspace(-3, -1, 10)}),
-    "ridge-F": (cumlRidge(fit_intercept=True,
-                          solver="eig",
-                          normalize=False),
+    "dummy-F2": (DummyModel(order='F'),
                 {'alpha': np.logspace(-3, -1, 10)}),
-    "logistic-F": (cumlLogisticRegression(fit_intercept=True,
-                                          solver="eig",
-                                          normalize=False),
-                   {'alpha': np.logspace(-3, -1, 10)}),
+    # "ridge-F": (cumlRidge(fit_intercept=True,
+    #                       solver="eig",
+    #                       normalize=False),
+    #             {'alpha': np.logspace(-3, -1, 10)}),
+    # "logistic-F": (cumlLogisticRegression(fit_intercept=True),
+    #                {'C': np.logspace(-3, -1, 10)}),
     }
 
 # XXX: note: RandomForestClassifier failed with:
@@ -73,8 +74,9 @@ print(f"""Duplicated data in memory: {dup_data.nbytes / 1e6} MB
 record_data = (('fea%d'%i, dup_data[:,i]) for i in range(dup_data.shape[1]))
 gdf_data = cudf.DataFrame(record_data)
 gdf_train = cudf.DataFrame(dict(train=dup_train))
-input_X = gdf_data.values
-input_y = gdf_train.train.values
+
+input_X = cp.array(gdf_data.values, dtype='float32', order='F')
+input_y = cp.array(gdf_train.train.values, dtype='float32')
 
 
 # Stop spew from input_utils
@@ -86,10 +88,14 @@ for name, (cu_clf, params) in estimators.items():
         cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
         cu_grid.fit(input_X, input_y, order='C')
 
-    with timed("%14s-patched_search-F" % name):
-        cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
-        cu_grid.fit(input_X, input_y, order='F')
+    # with timed("%14s-patched_search-F" % name):
+    #     cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
+    #     cu_grid.fit(input_X, input_y, order='F')
 
-    with timed("%14s-sklearn_search" % name):
-        sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
-        sk_grid.fit(input_X, input_y)
+    # with timed("%14s-sklearn_search" % name):
+    #     sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
+    #     sk_grid.fit(input_X, input_y)
+
+
+# Note - with a dummy model and the wrong input style, most time goes
+# to gpu_major_converter. A big chunk of that is in the compiler
