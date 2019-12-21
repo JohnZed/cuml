@@ -21,6 +21,7 @@ from cuml.experimental.hyperparams.dummy import DummyModel
 import sklearn
 from contextlib import contextmanager
 import time
+import cProfile
 
 @contextmanager
 def timed(txt):
@@ -47,10 +48,10 @@ estimators = {
     #             {'alpha': np.logspace(-3, -1, 10)}),
     # "dummy-C": (DummyModel(order='C'),
     #             {'alpha': np.logspace(-3, -1, 10)}),
-    "ridge-F": (cumlRidge(fit_intercept=True,
-                          solver="eig",
-                          normalize=False),
-                {'alpha': np.logspace(-3, -1, 10)}),
+    # "ridge-F": (cumlRidge(fit_intercept=True,
+    #                       solver="eig",
+    #                       normalize=False),
+    #             {'alpha': np.logspace(-3, -1, 10)}),
     # "logistic-F": (cumlLogisticRegression(fit_intercept=True),
     #                {'C': np.logspace(-3, -1, 10)}),
     }
@@ -86,6 +87,9 @@ input_y = cp.array(gdf_train.train.values, dtype='float32')
 import warnings
 warnings.filterwarnings("ignore")
 
+# pr = cProfile.Profile()
+# pr.enable()
+
 for name, (cu_clf, params) in estimators.items():
     with timed("%14s-patched_search-C" % name):
         cu_grid = patched_GridSearchCV(cu_clf, params, cv=N_FOLDS)
@@ -99,8 +103,8 @@ for name, (cu_clf, params) in estimators.items():
         sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
         sk_grid.fit(input_X, input_y)
 
-    # SOL estimate:
-    #  - Do the simplest possible fit/score with optimized inputs
+    SOL estimate:
+     - Do the simplest possible fit/score with optimized inputs
     sub_input_nrows = int(input_X.shape[0] * (1.0 - (1/float(N_FOLDS))))
     sub_train_X = cp.array(input_X[:sub_input_nrows, :], order='F')
     sub_train_y = cp.array(input_y[:sub_input_nrows])
@@ -112,4 +116,5 @@ for name, (cu_clf, params) in estimators.items():
             cu_clf.fit(sub_train_X, sub_train_y)
             cu_clf.score(sub_test_X, sub_test_y)
 
-    
+# pr.disable()
+# pr.print_stats()
