@@ -43,14 +43,14 @@ estimators = {
     "dummy-F": (DummyModel(order='F'),
                 {'alpha': np.logspace(-3, -1, 10)}),
     # Run same model twice to check for caching effects
-    "dummy-F2": (DummyModel(order='F'),
-                {'alpha': np.logspace(-3, -1, 10)}),
-    "dummy-C": (DummyModel(order='C'),
-                {'alpha': np.logspace(-3, -1, 10)}),
-    # "ridge-F": (cumlRidge(fit_intercept=True,
-    #                       solver="eig",
-    #                       normalize=False),
+    # "dummy-F2": (DummyModel(order='F'),
     #             {'alpha': np.logspace(-3, -1, 10)}),
+    # "dummy-C": (DummyModel(order='C'),
+    #             {'alpha': np.logspace(-3, -1, 10)}),
+    "ridge-F": (cumlRidge(fit_intercept=True,
+                          solver="eig",
+                          normalize=False),
+                {'alpha': np.logspace(-3, -1, 10)}),
     # "logistic-F": (cumlLogisticRegression(fit_intercept=True),
     #                {'C': np.logspace(-3, -1, 10)}),
     }
@@ -99,6 +99,17 @@ for name, (cu_clf, params) in estimators.items():
         sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
         sk_grid.fit(input_X, input_y)
 
+    # SOL estimate:
+    #  - Do the simplest possible fit/score with optimized inputs
+    sub_input_nrows = int(input_X.shape[0] * (1.0 - (1/float(N_FOLDS))))
+    sub_train_X = cp.array(input_X[:sub_input_nrows, :], order='F')
+    sub_train_y = cp.array(input_y[:sub_input_nrows])
+    sub_test_X = cp.array(input_X[sub_input_nrows:, :], order='F')
+    sub_test_y = cp.array(input_y[sub_input_nrows:])
+    nreps_total = len(list(params.items())[0][1]) * N_FOLDS
+    with timed("%14s-SOL-F" % name):
+        for i in range(nreps_total):
+            cu_clf.fit(sub_train_X, sub_train_y)
+            cu_clf.score(sub_test_X, sub_test_y)
 
-# Note - with a dummy model and the wrong input style, most time goes
-# to gpu_major_converter. A big chunk of that is in the compiler
+    
