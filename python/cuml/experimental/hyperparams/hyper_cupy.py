@@ -17,18 +17,11 @@ from sklearn.model_selection import train_test_split as sk_train_test_split, \
 
 from cuml.experimental.hyperparams.cu_search import patched_GridSearchCV
 from cuml.experimental.hyperparams.dummy import DummyModel
+from cuml.experimental.hyperparams.utils import *
 
 import sklearn
-from contextlib import contextmanager
-import time
 import cProfile
 
-@contextmanager
-def timed(txt):
-    t0 = time.time()
-    yield
-    t1 = time.time()
-    print("%32s time:  %8.5f" % (txt, t1 - t0))
 
 # Optional debugging wrapper to print input datatypes (off for now)
 # class Wrapper(cumlRidge):
@@ -37,7 +30,6 @@ def timed(txt):
 #         return super().fit(X, y, **kwargs)
 
 SCALE_FACTOR = int(1e5)
-params = {'alpha': np.logspace(-3, -1, 10)}
 N_FOLDS = 5
 
 estimators = {
@@ -48,10 +40,10 @@ estimators = {
     #             {'alpha': np.logspace(-3, -1, 10)}),
     # "dummy-C": (DummyModel(order='C'),
     #             {'alpha': np.logspace(-3, -1, 10)}),
-    # "ridge-F": (cumlRidge(fit_intercept=True,
-    #                       solver="eig",
-    #                       normalize=False),
-    #             {'alpha': np.logspace(-3, -1, 10)}),
+    "ridge-F": (cumlRidge(fit_intercept=True,
+                          solver="eig",
+                          normalize=False),
+                {'alpha': np.logspace(-3, -1, 10)}),
     # "logistic-F": (cumlLogisticRegression(fit_intercept=True),
     #                {'C': np.logspace(-3, -1, 10)}),
     }
@@ -103,14 +95,15 @@ for name, (cu_clf, params) in estimators.items():
         sk_grid = sk_GridSearchCV(cu_clf, params, cv=N_FOLDS)
         sk_grid.fit(input_X, input_y)
 
-    SOL estimate:
-     - Do the simplest possible fit/score with optimized inputs
+    # SOL estimate:
+    # - Do the simplest possible fit/score with optimized inputs
     sub_input_nrows = int(input_X.shape[0] * (1.0 - (1/float(N_FOLDS))))
     sub_train_X = cp.array(input_X[:sub_input_nrows, :], order='F')
     sub_train_y = cp.array(input_y[:sub_input_nrows])
     sub_test_X = cp.array(input_X[sub_input_nrows:, :], order='F')
     sub_test_y = cp.array(input_y[sub_input_nrows:])
     nreps_total = len(list(params.items())[0][1]) * N_FOLDS
+    print(f"Running {nreps_total} reps to cover {N_FOLDS} folds")
     with timed("%14s-SOL-F" % name):
         for i in range(nreps_total):
             cu_clf.fit(sub_train_X, sub_train_y)
