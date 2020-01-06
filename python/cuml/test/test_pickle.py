@@ -29,6 +29,7 @@ from sklearn.model_selection import train_test_split
 
 regression_models = {
     "LinearRegression": lambda: cuml.LinearRegression(),
+    "LogisticRegression": lambda: cuml.LogisticRegression(),
     "Lasso": lambda: cuml.Lasso(),
     "Ridge": lambda: cuml.Ridge(),
     "ElasticNet": lambda: cuml.ElasticNet()
@@ -36,7 +37,8 @@ regression_models = {
 
 solver_models = {
     "CD": lambda: cuml.CD(),
-    "SGD": lambda: cuml.SGD(eta0=0.005)
+    "SGD": lambda: cuml.SGD(eta0=0.005),
+    "QN": lambda: cuml.QN(loss="softmax")
 }
 
 cluster_models = {
