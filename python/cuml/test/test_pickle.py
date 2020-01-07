@@ -30,6 +30,8 @@ from sklearn.model_selection import train_test_split
 regression_models = {
     "LinearRegression": lambda: cuml.LinearRegression(),
     "LogisticRegression": lambda: cuml.LogisticRegression(),
+    "LogisticRegressionNoInt": lambda: cuml.LogisticRegression(
+        fit_intercept=False),
     "Lasso": lambda: cuml.Lasso(),
     "Ridge": lambda: cuml.Ridge(),
     "ElasticNet": lambda: cuml.ElasticNet()
@@ -303,6 +305,20 @@ def test_decomposition_pickle_xfail(tmpdir, datatype, keys, data_size):
                            pickled_model.transform(X_test))
 
     pickle_save_load(tmpdir, create_mod, assert_model)
+
+
+@pytest.mark.parametrize('model_name',
+                         list(regression_models.keys()) +
+                         list(solver_models.keys()) +
+                         list(cluster_models.keys()))
+def test_unfit_pickle(model_name):
+    # Pickling should work even if fit has not been called
+    possible_models = {**regression_models,
+                       **solver_models,
+                       **cluster_models}
+    mod = possible_models[model_name]()
+    mod_pickled_bytes = pickle.dumps(mod)
+    mod_unpickled = pickle.loads(mod_pickled_bytes)
 
 
 @pytest.mark.parametrize('datatype', [np.float32, np.float64])

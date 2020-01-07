@@ -31,7 +31,7 @@ import numpy as np
 
 supported_penalties = ['l1', 'l2', 'none', 'elasticnet']
 
-supported_solvers = ['qn', 'lbfgs', 'owl']
+supported_solvers = ['qn']
 
 
 class LogisticRegression(Base):
@@ -171,8 +171,9 @@ class LogisticRegression(Base):
             raise ValueError("`penalty` " + str(penalty) + "not supported.")
 
         if solver not in supported_solvers:
-            raise ValueError("Only quasi-newton `qn` (lbfgs and owl) solvers "
-                             " supported.")
+            raise ValueError("Only quasi-newton `qn` solver is "
+                             " supported, not %s" % solver)
+        self.solver = solver
 
         self.C = C
         self.penalty = penalty
@@ -350,13 +351,15 @@ class LogisticRegression(Base):
 
         if 'qn' in state:
             qn = state['qn']
-            if qn.fit_intercept:
-                state['coef_'] = qn.coef_[0:-1]
-                state['intercept_'] = qn.coef_[-1]
-            else:
-                state['coef_'] = qn.coef_
-                n_classes = qn.coef_.shape[1]
-                state['intercept_'] = rmm.to_device(np.zeros(n_classes,
-                                                             dtype=state['dtype']))
+            if qn.coef_ is not None:
+                if qn.fit_intercept:
+                    state['coef_'] = qn.coef_[0:-1]
+                    state['intercept_'] = qn.coef_[-1]
+                else:
+                    state['coef_'] = qn.coef_
+                    n_classes = qn.coef_.shape[1]
+                    state['intercept_'] = rmm.to_device(np.zeros(
+                        n_classes,
+                        dtype=qn.coef_.dtype))
 
         self.__dict__.update(state)
