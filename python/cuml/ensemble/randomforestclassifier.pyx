@@ -281,6 +281,7 @@ class RandomForestClassifier(Base):
         self.n_bins = n_bins
         self.quantile_per_tree = quantile_per_tree
         self.n_cols = None
+        self.dtype = None
         self.n_streams = handle.getNumInternalStreams()
         self.seed = seed
         if ((seed is not None) and (n_streams != 1)):
@@ -302,7 +303,9 @@ class RandomForestClassifier(Base):
     def __getstate__(self):
         state = self.__dict__.copy()
         del state['handle']
-        self.model_pbuf_bytes = self._get_model_info()
+        if self.n_cols is not None:
+            # only if model has been fit previously
+            self.model_pbuf_bytes = self._get_model_info()
         cdef size_t params_t = <size_t> self.rf_forest
         cdef  RandomForestMetaData[float, int] *rf_forest = \
             <RandomForestMetaData[float, int]*>params_t

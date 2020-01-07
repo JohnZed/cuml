@@ -269,6 +269,7 @@ class RandomForestRegressor(Base):
         self.verbose = verbose
         self.n_bins = n_bins
         self.n_cols = None
+        self.dtype = None
         self.accuracy_metric = accuracy_metric
         self.quantile_per_tree = quantile_per_tree
         self.n_streams = handle.getNumInternalStreams()
@@ -291,7 +292,9 @@ class RandomForestRegressor(Base):
     def __getstate__(self):
         state = self.__dict__.copy()
         del state['handle']
-        self.model_pbuf_bytes = self._get_model_info()
+        if self.n_cols:
+            # only if model has been fit previously
+            self.model_pbuf_bytes = self._get_model_info()
         cdef size_t params_t = <size_t> self.rf_forest
         cdef  RandomForestMetaData[float, float] *rf_forest = \
             <RandomForestMetaData[float, float]*>params_t
