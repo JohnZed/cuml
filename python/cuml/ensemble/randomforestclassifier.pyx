@@ -303,8 +303,8 @@ class RandomForestClassifier(Base):
     def __getstate__(self):
         state = self.__dict__.copy()
         del state['handle']
-        if self.n_cols is not None:
-            # only if model has been fit previously
+        if self.n_cols:
+            # only if model has been fit previouslyo
             self.model_pbuf_bytes = self._get_model_info()
         cdef size_t params_t = <size_t> self.rf_forest
         cdef  RandomForestMetaData[float, int] *rf_forest = \
@@ -692,7 +692,8 @@ class RandomForestClassifier(Base):
         return preds
 
     def score(self, X, y, threshold=0.5,
-              algo='BATCH_TREE_REORG', num_classes=2):
+              algo='BATCH_TREE_REORG', num_classes=2,
+              convert_dtype=True):
         """
         Calculates the accuracy metric score of the model for X.
 
@@ -718,6 +719,9 @@ class RandomForestClassifier(Base):
             predict operation on the GPU.
         num_classes : integer
             number of different classes present in the dataset
+        convert_dtype : boolean, default=True
+            whether to convert input data to correct dtype automatically
+
         Returns
         -------
         float
@@ -725,11 +729,14 @@ class RandomForestClassifier(Base):
         """
         cdef uintptr_t X_ptr, y_ptr
         y_m, y_ptr, n_rows, _, y_dtype = \
-            input_to_dev_array(y, check_dtype=np.int32)
+            input_to_dev_array(y, check_dtype=np.int32,
+                               convert_to_dtype=(np.int32 if convert_dtype
+                                                else False))
 
         preds = self.predict(X, output_class=True,
                              threshold=threshold, algo=algo,
-                             num_classes=num_classes)
+                             num_classes=num_classes,
+                             convert_dtype=convert_dtype)
 
         cdef uintptr_t preds_ptr
         preds_m, preds_ptr, _, _, _ = \

@@ -22,6 +22,7 @@ ESTIMATORS = {
     'elastic': (cuml.ElasticNet(fit_intercept=False), ["alpha"]),
     'logistic': (cuml.LogisticRegression(fit_intercept=True, solver='qn'), ["C"]),
     'qn': (cuml.QN(fit_intercept=True, loss="softmax"), ["l1_strength"]),
+    'rfr': (cuml.RandomForestRegressor(), ["min_impurity_decrease"]),
     'dummy': (DummyModel(order='F'), ["alpha"])
 }
 
