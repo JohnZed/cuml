@@ -190,6 +190,9 @@ def _treelite_format_hook(data):
     return treelite_runtime.Batch.from_npy2d(data[0]), data[1]
 
 
+# Note: when adding an algorithm, take care to set n_jobs=-1 by default
+# for sklearn algorithms that support this parameter and have a speedup
+# from multiple jobs.
 def all_algorithms():
     """Returns all defined AlgorithmPair objects"""
     algorithms = [
@@ -247,10 +250,12 @@ def all_algorithms():
             sklearn.cluster.DBSCAN,
             cuml.DBSCAN,
             shared_args=dict(eps=3, min_samples=2),
-            cpu_args=dict(algorithm="brute"),
+            cpu_args=dict(algorithm="brute", n_jobs=-1),
             name="DBSCAN",
             accepts_labels=False,
         ),
+        # n_jobs only provides a speedup for multi-target, so omitting for
+        # linear_models below
         AlgorithmPair(
             sklearn.linear_model.LinearRegression,
             cuml.linear_model.LinearRegression,
@@ -295,6 +300,7 @@ def all_algorithms():
             sklearn.ensemble.RandomForestClassifier,
             cuml.ensemble.RandomForestClassifier,
             shared_args={"max_features": 1.0, "n_estimators": 10},
+            cpu_args=dict(n_jobs=-1),
             name="RandomForestClassifier",
             accepts_labels=True,
             cpu_data_prep_hook=_labels_to_int_hook,
@@ -305,6 +311,7 @@ def all_algorithms():
             sklearn.ensemble.RandomForestRegressor,
             cuml.ensemble.RandomForestRegressor,
             shared_args={"max_features": 1.0, "n_estimators": 10},
+            cpu_args=dict(n_jobs=-1),
             name="RandomForestRegressor",
             accepts_labels=True,
             accuracy_function=metrics.r2_score,
@@ -366,6 +373,7 @@ def all_algorithms():
             cuml.neighbors.KNeighborsClassifier,
             shared_args={},
             cuml_args={},
+            cpu_args=dict(n_jobs=-1),
             name="KNeighborsClassifier",
             accepts_labels=True,
             accuracy_function=cuml.metrics.accuracy_score
@@ -375,6 +383,7 @@ def all_algorithms():
             cuml.neighbors.KNeighborsRegressor,
             shared_args={},
             cuml_args={},
+            cpu_args=dict(n_jobs=-1),
             name="KNeighborsRegressor",
             accepts_labels=True,
             accuracy_function=cuml.metrics.r2_score
@@ -428,7 +437,7 @@ def all_algorithms():
             cuml.manifold.UMAP,
             shared_args=dict(n_neighbors=5, n_epochs=500),
             name="UMAP-Unsupervised",
-            accepts_labels=True,
+            accepts_labels=False,
             accuracy_function=cuml.metrics.trustworthiness,
         ),
         AlgorithmPair(
