@@ -60,8 +60,8 @@ def _gen_data_regression(n_samples, n_features, random_state=42):
     return cudf.DataFrame(X_arr), cudf.Series(y_arr)
 
 
-def _gen_data_blobs(n_samples, n_features, random_state=42, centers=None):
-    """Wrapper for sklearn make_blobs"""
+def _gen_data_blobs(n_samples, n_features, random_state=42, centers=2):
+    """Wrapper for sklearn make_blobs (with default of 2 classes)"""
     if n_samples == 0:
         n_samples = int(1e6)
     if n_features == 0:
@@ -70,6 +70,7 @@ def _gen_data_blobs(n_samples, n_features, random_state=42, centers=None):
         n_samples=n_samples, n_features=n_features, centers=centers,
         random_state=random_state, dtype=np.float32)
     print(type(X_arr), type(y_arr))
+
     return (
         cudf.DataFrame(X_arr),
         cudf.Series(y_arr),

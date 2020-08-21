@@ -21,7 +21,7 @@ import sklearn.neighbors
 import sklearn.ensemble
 import sklearn.random_projection
 import sklearn.naive_bayes
-from cuml import metrics
+from sklearn import metrics
 import cuml.metrics
 import cuml.decomposition
 import cuml.naive_bayes
@@ -183,6 +183,10 @@ class AlgorithmPair:
 def _labels_to_int_hook(data):
     """Helper function converting labels to int32"""
     return data[0], data[1].astype(np.int32)
+
+def _labels_to_float_hook(data):
+    """Helper function converting labels to float32"""
+    return data[0], data[1].astype(np.float32)
 
 
 def _treelite_format_hook(data):
@@ -350,6 +354,8 @@ def all_algorithms():
             cuml_args={},
             name="SVC-RBF",
             accepts_labels=True,
+            cpu_data_prep_hook=_labels_to_int_hook,
+            cuml_data_prep_hook=_labels_to_int_hook,
             accuracy_function=cuml.metrics.accuracy_score,
         ),
         AlgorithmPair(
@@ -359,6 +365,8 @@ def all_algorithms():
             cuml_args={},
             name="SVC-Linear",
             accepts_labels=True,
+            cpu_data_prep_hook=_labels_to_int_hook,
+            cuml_data_prep_hook=_labels_to_int_hook,
             accuracy_function=cuml.metrics.accuracy_score,
         ),
         AlgorithmPair(
@@ -387,6 +395,8 @@ def all_algorithms():
             cpu_args=dict(n_jobs=-1),
             name="KNeighborsClassifier",
             accepts_labels=True,
+            cpu_data_prep_hook=_labels_to_int_hook,
+            cuml_data_prep_hook=_labels_to_int_hook,
             accuracy_function=cuml.metrics.accuracy_score
         ),
         AlgorithmPair(
