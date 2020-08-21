@@ -47,7 +47,7 @@ import sklearn.model_selection
 from urllib.request import urlretrieve
 from cuml.common import input_utils
 from numba import cuda
-
+import cupy as cp
 
 def _gen_data_regression(n_samples, n_features, random_state=42):
     """Wrapper for sklearn make_regression"""
@@ -68,11 +68,11 @@ def _gen_data_blobs(n_samples, n_features, random_state=42, centers=None):
         n_samples = 100
     X_arr, y_arr = cuml.datasets.make_blobs(
         n_samples=n_samples, n_features=n_features, centers=centers,
-        random_state=random_state)
+        random_state=random_state, dtype=np.float32)
     print(type(X_arr), type(y_arr))
     return (
-        cudf.DataFrame(X_arr.astype(np.float32)),
-        cudf.Series(y_arr.astype(np.float32)),
+        cudf.DataFrame(X_arr),
+        cudf.Series(y_arr),
     )
 
 
@@ -95,11 +95,11 @@ def _gen_data_classification(
 
     X_arr, y_arr = cuml.datasets.make_classification(
         n_samples=n_samples, n_features=n_features, n_classes=n_classes,
-        random_state=random_state)
+        random_state=random_state, dtype=np.float32)
 
     return (
-        cudf.DataFrame(X_arr.astype(np.float32)),
-        cudf.Series(y_arr.astype(np.float32)),
+        cudf.DataFrame(X_arr),
+        cudf.Series(y_arr),
     )
 
 
@@ -216,9 +216,9 @@ def _convert_to_gpuarray(data, order='F'):
                                     order=order)
     elif isinstance(data, pd.Series):
         gs = cudf.Series.from_pandas(data)
-        return cuda.as_cuda_array(gs)
+        return cp.array(cuda.as_cuda_array(gs))
     else:
-        return input_utils.input_to_dev_array(data, order=order)[0]
+        return cp.array(input_utils.input_to_dev_array(data, order=order)[0])
 
 
 def _convert_to_gpuarray_c(data):

@@ -21,7 +21,7 @@ import sklearn.neighbors
 import sklearn.ensemble
 import sklearn.random_projection
 import sklearn.naive_bayes
-from sklearn import metrics
+from cuml import metrics
 import cuml.metrics
 import cuml.decomposition
 import cuml.naive_bayes
@@ -245,6 +245,17 @@ def all_algorithms():
             name="NearestNeighbors",
             accepts_labels=False,
             bench_func=fit_kneighbors,
+        ),
+        AlgorithmPair(
+            sklearn.neighbors.KNeighborsClassifier,
+            cuml.neighbors.KNeighborsClassifier,
+            shared_args=dict(n_neighbors=5), # skl default
+            cpu_args=dict(algorithm="brute", n_jobs=-1),
+            cuml_args={},
+            cpu_data_prep_hook=_labels_to_int_hook,
+            cuml_data_prep_hook=_labels_to_int_hook,
+            name="KNeighborsClassifier",
+            accepts_labels=True,
         ),
         AlgorithmPair(
             sklearn.cluster.DBSCAN,
