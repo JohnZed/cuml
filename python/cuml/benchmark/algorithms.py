@@ -314,6 +314,7 @@ def all_algorithms():
         AlgorithmPair(
             sklearn.ensemble.RandomForestClassifier,
             cuml.ensemble.RandomForestClassifier,
+            # Default cuml max_depth - ensure it applies to both
             shared_args={"max_features": 1.0,
                          "n_estimators": 10,
                          "max_depth": 16},
