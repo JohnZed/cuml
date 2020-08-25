@@ -314,7 +314,9 @@ def all_algorithms():
         AlgorithmPair(
             sklearn.ensemble.RandomForestClassifier,
             cuml.ensemble.RandomForestClassifier,
-            shared_args={"max_features": 1.0, "n_estimators": 10},
+            shared_args={"max_features": 1.0,
+                         "n_estimators": 10,
+                         "max_depth": 16},
             cpu_args=dict(n_jobs=-1),
             name="RandomForestClassifier",
             accepts_labels=True,
@@ -325,7 +327,9 @@ def all_algorithms():
         AlgorithmPair(
             sklearn.ensemble.RandomForestRegressor,
             cuml.ensemble.RandomForestRegressor,
-            shared_args={"max_features": 1.0, "n_estimators": 10},
+            shared_args={"max_features": 1.0,
+                         "n_estimators": 10,
+                         "max_depth": 16},
             cpu_args=dict(n_jobs=-1),
             name="RandomForestRegressor",
             accepts_labels=True,
